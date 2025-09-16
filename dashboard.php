@@ -122,7 +122,11 @@ $newsResult = $conn->query($newsSql);
                     <br><a href="dashboard.php?delete=<?= $row['id']; ?>" 
                            onclick="return confirm('Are you sure you want to delete this news?');">
                            🗑 Delete
+                        
                         </a>
+                         <a href="edit.php?id=<?= $row['id']; ?>">
+            Edit
+                    </a> 
                 </li>
                 <hr>
             <?php endwhile; ?>
