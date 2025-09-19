@@ -20,34 +20,43 @@ $articles = $data['articles'] ?? $data['results'] ?? [];
 
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Global News - Top 20</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    .news-item { border-bottom: 1px solid #ccc; padding: 10px 0; }
-    .news-item h3 { margin: 0; font-size: 18px; }
-    .news-item p { margin: 5px 0; color: #555; }
-  </style>
+  <meta charset="UTF-8">
+  <title>Global News</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
-  <h1>🌍 Global News (Top 20)</h1>
+<body class="bg-light">
 
-  <?php if (empty($articles)): ?>
-    <p>No news found. Please check your API key or try later.</p>
-  <?php else: ?>
-    <?php foreach ($articles as $article): ?>
-      <div class="news-item">
-        <h3>
-          <a href="<?php echo htmlspecialchars($article['url']); ?>" target="_blank">
-            <?php echo htmlspecialchars($article['title']); ?>
-          </a>
-        </h3>
-        <p><?php echo htmlspecialchars($article['description'] ?? ''); ?></p>
-                <p> <img src="<?php echo htmlspecialchars($article['image'] ?? ''); ?>"/></p>
+<div class="container my-5">
+    <h2 class="text-center mb-4">🌍 Global News (Top 20)</h2>
 
-      </div>
-    <?php endforeach; ?>
-  <?php endif; ?>
+    <?php if (!empty($articles)) { ?>
+        <div class="row">
+            <?php foreach ($articles as $news) { ?>
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        <?php if (!empty($news['urlToImage'])) { ?>
+                            <img src="<?php echo $news['urlToImage']; ?>" class="card-img-top" style="height:200px;object-fit:cover;">
+                        <?php } ?>
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title"><?php echo htmlspecialchars($news['title']); ?></h5>
+                            <p class="card-text text-muted">
+                                <?php echo htmlspecialchars(substr($news['description'], 0, 100)) . '...'; ?>
+                            </p>
+                            <a href="<?php echo $news['url']; ?>" target="_blank" class="btn btn-dark mt-auto">Read More</a>
+                        </div>
+                        <div class="card-footer text-muted small">
+                            <?php echo $news['source']['name'] ?? "Unknown Source"; ?>
+                        </div>
+                    </div>
+                </div>
+            <?php } ?>
+        </div>
+    <?php } else { ?>
+        <div class="alert alert-danger text-center">❌ Failed to load news. Please try again later.</div>
+    <?php } ?>
+</div>
+
 </body>
 </html>

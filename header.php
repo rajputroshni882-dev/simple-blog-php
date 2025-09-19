@@ -18,7 +18,6 @@ session_start();
             <a href="signup.php">signup</a>
             <a href="login.php">login</a>
             <a href="global_news.php">Global News</a>
-
         <?php endif; ?>
     </nav>
 </body>

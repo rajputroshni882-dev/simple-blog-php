@@ -1,138 +1,124 @@
 <?php
-// dashboard.php
-session_start();
 include 'config.php';
-include 'header.php';
 
-// Check login
-if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
-    exit();
+// How many news per page
+$limit = 5;
+
+// Current page (default = 1)
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
+
+// Search keyword
+$search = isset($_GET['search']) ? trim($_GET['search']) : "";
+
+// Base query
+$where = "";
+if (!empty($search)) {
+    $safeSearch = $conn->real_escape_string($search);
+    $where = "WHERE title LIKE '%$safeSearch%'";
 }
 
-$username = $_SESSION['user_name'];
-$user_id  = $_SESSION['user_id'];
+// Count total news
+$totalResult = $conn->query("SELECT COUNT(*) as total FROM news $where");
+$totalRow = $totalResult->fetch_assoc();
+$totalNews = $totalRow['total'];
 
-$success = "";
-$error   = "";
+// Total pages
+$totalPages = ceil($totalNews / $limit);
 
-// 🗑 Handle delete request
-if (isset($_GET['delete'])) {
-    $delete_id = intval($_GET['delete']);
-    $conn->query("DELETE FROM news WHERE id = $delete_id AND user_id = $user_id");
-    header("Location: dashboard.php");
-    exit();
-}
+// Offset
+$offset = ($page - 1) * $limit;
 
-// ✍ Handle new post (with file upload)
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['title'], $_POST['description'])) {
-    $title       = mysqli_real_escape_string($conn, trim($_POST['title']));
-    $description = mysqli_real_escape_string($conn, trim($_POST['description']));
-    $imagePath   = null;
-
-    // ✅ Handle file upload
-    if (!empty($_FILES['image']['name'])) {
-        $targetDir = "uploads/"; // make sure this folder exists and is writable
-        if (!is_dir($targetDir)) {
-            mkdir($targetDir, 0777, recursive: true);
-        }
-
-        $fileName   = time() . "_" . basename($_FILES['image']['name']);
-        $targetFile = $targetDir . $fileName;
-
-        $fileType = strtolower(pathinfo($targetFile, PATHINFO_EXTENSION));
-        $allowedTypes = ['jpg', 'jpeg', 'png', 'gif'];
-
-        if (in_array($fileType, $allowedTypes)) {
-            if (move_uploaded_file($_FILES['image']['tmp_name'], $targetFile)) {
-                $imagePath = $targetFile;
-            } else {
-                $error = "❌ Failed to upload image.";
-            }
-        } else {
-            $error = "⚠️ Only JPG, JPEG, PNG, and GIF files are allowed.";
-        }
-    }
-
-    if (!empty($title) && !empty($description) && empty($error)) {
-        $sql = "INSERT INTO news (user_id, title, description, image) 
-                VALUES ('$user_id', '$title', '$description', " . ($imagePath ? "'$imagePath'" : "NULL") . ")";
-        if ($conn->query($sql) === TRUE) {
-            $success = "✅ News saved successfully!";
-        } else {
-            $error = "❌ Error: " . $conn->error;
-        }
-    } elseif (empty($error)) {
-        $error = "⚠️ Please fill in all fields.";
-    }
-}
-
-// 📌 Fetch all news
-$newsSql    = "SELECT * FROM news WHERE user_id = '$user_id' ORDER BY created_at DESC";
-$newsResult = $conn->query($newsSql);
+// Fetch news
+$sql = "SELECT * FROM news $where ORDER BY created_at DESC LIMIT $limit OFFSET $offset";
+$result = $conn->query($sql);
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard</title>
+  <meta charset="UTF-8">
+  <title>News Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
-    <h2>Welcome to your Dashboard</h2>
-    <p>Hello, <strong><?= htmlspecialchars($username); ?></strong> 👋</p>
-    <a href="logout.php">Logout</a>
+<body class="bg-light">
 
-    <hr>
+<div class="container mt-5">
+    <div class="card shadow-lg">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <h3 class="mb-0">📰 News Dashboard</h3>
+            <form method="GET" action="" class="d-flex">
+                <input type="text" name="search" class="form-control me-2" 
+                       placeholder="Search by title..." value="<?php echo htmlspecialchars($search); ?>">
+                <button class="btn btn-light" type="submit">Search</button>
+            </form>
+        </div>
+        <div class="card-body">
 
-    <h3>Create News</h3>
-    <?php if ($success): ?><p style="color:green;"><?= $success; ?></p><?php endif; ?>
-    <?php if ($error): ?><p style="color:red;"><?= $error; ?></p><?php endif; ?>
+            <?php if ($result->num_rows > 0) { ?>
+                <table class="table table-bordered table-striped align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Image</th>
+                            <th>Created At</th>
+                            <th style="width: 150px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php while ($row = $result->fetch_assoc()) { ?>
+                        <tr>
+                            <td><?php echo $row['id']; ?></td>
+                            <td><?php echo htmlspecialchars($row['title']); ?></td>
+                            <td>
+                                <?php if ($row['image']) { ?>
+                                    <img src="uploads/<?php echo $row['image']; ?>" width="80" class="img-thumbnail">
+                                <?php } else { ?>
+                                    <span class="text-muted">No Image</span>
+                                <?php } ?>
+                            </td>
+                            <td><?php echo $row['created_at']; ?></td>
+                            <td>
+                                <a href="edit_news.php?id=<?php echo $row['id']; ?>" class="btn btn-sm btn-primary">Edit</a>
+                                <a href="delete_news.php?id=<?php echo $row['id']; ?>" 
+                                   onclick="return confirm('Are you sure you want to delete this news?');" 
+                                   class="btn btn-sm btn-danger">Delete</a>
+                            </td>
+                        </tr>
+                        <?php } ?>
+                    </tbody>
+                </table>
 
-    <form action="" method="POST" enctype="multipart/form-data">
-        <label>Title:</label><br>
-        <input type="text" name="title" required><br><br>
+                <!-- Pagination -->
+                <nav>
+                    <ul class="pagination justify-content-center">
+                        <?php if ($page > 1): ?>
+                            <li class="page-item">
+                                <a class="page-link" href="?search=<?php echo urlencode($search); ?>&page=<?php echo $page - 1; ?>">« Prev</a>
+                            </li>
+                        <?php endif; ?>
 
-        <label>Description:</label><br>
-        <textarea name="description" rows="5" required></textarea><br><br>
+                        <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+                            <li class="page-item <?php if ($i == $page) echo 'active'; ?>">
+                                <a class="page-link" href="?search=<?php echo urlencode($search); ?>&page=<?php echo $i; ?>"><?php echo $i; ?></a>
+                            </li>
+                        <?php endfor; ?>
 
-        <label>Upload Image:</label><br>
-        <input type="file" name="image" accept="image/*"><br><br>
+                        <?php if ($page < $totalPages): ?>
+                            <li class="page-item">
+                                <a class="page-link" href="?search=<?php echo urlencode($search); ?>&page=<?php echo $page + 1; ?>">Next »</a>
+                            </li>
+                        <?php endif; ?>
+                    </ul>
+                </nav>
 
-        <button type="submit">Save News</button>
-    </form>
+            <?php } else { ?>
+                <div class="alert alert-warning text-center">⚠️ No news found.</div>
+            <?php } ?>
+        </div>
+    </div>
+</div>
 
-    <hr>
-
-    <h3>Your News</h3>
-    <?php if ($newsResult->num_rows > 0): ?>
-        <ul>
-            <?php while ($row = $newsResult->fetch_assoc()): ?>
-                <li>
-                    <a href="view_news.php?id=<?= $row['id']; ?>">
-                        <?= htmlspecialchars($row['title']); ?>
-                    </a> 
-                    (<?= date("d M Y, h:i A", strtotime($row['created_at'])); ?>)
-
-                    <?php if ($row['image']): ?>
-                        <br><img src="<?= $row['image']; ?>" width="120" style="margin:5px 0;">
-                    <?php endif; ?>
-
-                    <!-- 🗑 Delete link -->
-                    <br><a href="dashboard.php?delete=<?= $row['id']; ?>" 
-                           onclick="return confirm('Are you sure you want to delete this news?');">
-                           🗑 Delete
-                        
-                        </a>
-                         <a href="edit.php?id=<?= $row['id']; ?>">
-            Edit
-                    </a> 
-                </li>
-                <hr>
-            <?php endwhile; ?>
-        </ul>
-    <?php else: ?>
-        <p>No news posted yet.</p>
-    <?php endif; ?>
 </body>
 </html>
